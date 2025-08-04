@@ -1,0 +1,43 @@
+
+import httpx
+
+@app.get("/sniper/logs")
+async def get_sniper_logs():
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute(
+            "SELECT casino, result, roi, timestamp FROM sniper_logs ORDER BY id DESC"
+        ).fetchall()
+    return {"logs": [
+        {"casino": c, "result": r, "roi": roi, "timestamp": ts}
+        for c, r, roi, ts in rows
+    ]}
+
+@app.get("/prophecy/logs")
+async def get_prophecy_logs():
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute(
+            "SELECT content, timestamp FROM prophecies ORDER BY id DESC"
+        ).fetchall()
+    return {"logs": [
+        {"content": content, "timestamp": ts}
+        for content, ts in rows
+    ]}
+
+@app.post("/voice-prophecy")
+async def voice_prophecy(payload: dict):
+    content = payload.get("user_input", "")
+    ts = datetime.datetime.now(pytz.UTC).isoformat()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO prophecies (content, timestamp) VALUES (?, ?)",
+            (content, ts)
+        )
+    return {"content": content, "timestamp": ts}
+
+@app.get("/coins/{coin}/market_chart")
+async def proxy_coin_chart(coin: str, vs_currency: str, days: int):
+    url = f"https://api.coingecko.com/api/v3/coins/{coin}/market_chart?vs_currency={vs_currency}&days={days}"
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+        return resp.json()
